@@ -31,6 +31,11 @@ class CustomSkillSetter:
             676,  # Offhand Axe
             198,  # Offhand Mace
             674,  # Dual wield
+            413, # Mail
+            293, #Plate Mail
+            415, # Cloth
+            414, # Leather
+            433, #Shield
         ]
 
     def generate_all_weapon_proficiencies_sql(self, filename):

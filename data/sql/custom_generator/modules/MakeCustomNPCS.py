@@ -12,7 +12,7 @@ class MakeCustomNPCS:
 
         with open(self.filename / "battlemaster.sql", "w") as sql_file:
             sql_file.write("UPDATE acore_world.creature "
-                           "SET position_x = -8913.835, position_y = -135.12477, position_z = 80.4693 WHERE guid = 79942;\n") # Added semicolon and newline
+                           "SET position_x = -8913.835, position_y = -135.12477, position_z = 80.4693 WHERE guid = 79942;\n") e
             sql_file.write("UPDATE acore_world.creature_template "
                            "SET name = 'Lieutenant Battlemaster' WHERE entry = 823;\n")
 

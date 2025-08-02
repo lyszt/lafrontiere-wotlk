@@ -2259,12 +2259,7 @@ InventoryResult Player::CanUseItem(Item* pItem, bool not_loading) const
                         allowEquip = (itemSkill == SKILL_MAIL);
                     }
                 }
-                if (!allowEquip && GetSkillValue(itemSkill) == 0)
-                    return EQUIP_ERR_NO_REQUIRED_PROFICIENCY;
-            }
 
-            if (pProto->RequiredReputationFaction && uint32(GetReputationRank(pProto->RequiredReputationFaction)) < pProto->RequiredReputationRank)
-                return EQUIP_ERR_CANT_EQUIP_REPUTATION;
 
             return EQUIP_ERR_OK;
         }

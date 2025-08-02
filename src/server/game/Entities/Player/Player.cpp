@@ -13755,6 +13755,9 @@ uint32 Player::GetPhaseMaskForSpawn() const
 
 InventoryResult Player::CanEquipUniqueItem(Item* pItem, uint8 eslot, uint32 limit_count) const
 {
+    return EQUIP_ERR_OK;
+    // Removes all unique item limits
+
     ItemTemplate const* pProto = pItem->GetTemplate();
 
     // proto based limitations
@@ -13788,6 +13791,9 @@ InventoryResult Player::CanEquipUniqueItem(Item* pItem, uint8 eslot, uint32 limi
 
 InventoryResult Player::CanEquipUniqueItem(ItemTemplate const* itemProto, uint8 except_slot, uint32 limit_count) const
 {
+    return EQUIP_ERR_OK;
+    // Removes all unique item limits
+
     // check unique-equipped on item
     if (itemProto->HasFlag(ITEM_FLAG_UNIQUE_EQUIPPABLE))
     {

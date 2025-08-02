@@ -9,8 +9,8 @@ class CustomSkillSetter:
     def __init__(self):
         self.races = [1, 2, 3, 4, 5, 6, 7, 8, 10, 11]
         self.classes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11]
-        self.all_races_mask = 2549
-        self.all_classes_mask = 2047
+        self.all_races_mask = 1791
+        self.all_classes_mask = 1535
         self.proficiencies = [
             196,  # One-Handed Axes
             197,  # Two-Handed Axes
@@ -31,11 +31,11 @@ class CustomSkillSetter:
             676,  # Offhand Axe
             198,  # Offhand Mace
             674,  # Dual wield
-            413, # Mail
-            293, #Plate Mail
-            415, # Cloth
-            414, # Leather
-            433, #Shield
+            8737, # Mail
+            750, # Plate Mail
+            9078, # Cloth
+            9077, # Leather
+            9116, #Shield
         ]
 
     def generate_all_weapon_proficiencies_sql(self, filename):

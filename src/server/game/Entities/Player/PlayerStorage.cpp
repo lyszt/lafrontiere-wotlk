@@ -2259,10 +2259,6 @@ InventoryResult Player::CanUseItem(Item* pItem, bool not_loading) const
                         allowEquip = (itemSkill == SKILL_MAIL);
                     }
                 }
-
-
-            return EQUIP_ERR_OK;
-        }
     }
     return EQUIP_ERR_ITEM_NOT_FOUND;
 }

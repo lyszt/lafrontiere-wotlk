@@ -7677,21 +7677,22 @@ SpellCastResult Spell::CheckItems()
                                 if (ammoProto->Class != ITEM_CLASS_PROJECTILE)
                                     return SPELL_FAILED_NO_AMMO;
 
-                                // check ammo ws. weapon compatibility
-                                switch (pItem->GetTemplate()->SubClass)
-                                {
-                                    case ITEM_SUBCLASS_WEAPON_BOW:
-                                    case ITEM_SUBCLASS_WEAPON_CROSSBOW:
-                                        if (ammoProto->SubClass != ITEM_SUBCLASS_ARROW)
-                                            return SPELL_FAILED_NO_AMMO;
-                                        break;
-                                    case ITEM_SUBCLASS_WEAPON_GUN:
-                                        if (ammoProto->SubClass != ITEM_SUBCLASS_BULLET)
-                                            return SPELL_FAILED_NO_AMMO;
-                                        break;
-                                    default:
-                                        return SPELL_FAILED_NO_AMMO;
-                                }
+                                // // check ammo ws. weapon compatibility
+                                // switch (pItem->GetTemplate()->SubClass)
+                                // {
+                                //     case ITEM_SUBCLASS_WEAPON_BOW:
+                                //     case ITEM_SUBCLASS_WEAPON_CROSSBOW:
+                                //         if (ammoProto->SubClass != ITEM_SUBCLASS_ARROW)
+                                //             return SPELL_FAILED_NO_AMMO;
+                                //         break;
+                                //     case ITEM_SUBCLASS_WEAPON_GUN:
+                                //         if (ammoProto->SubClass != ITEM_SUBCLASS_BULLET)
+                                //             return SPELL_FAILED_NO_AMMO;
+                                //         break;
+                                //     default:
+                                //         return SPELL_FAILED_NO_AMMO;
+                                // }
+                            // Removed. Any ammo can be used for any weapon.
 
                                 if (!m_caster->ToPlayer()->HasItemCount(ammo))
                                 {

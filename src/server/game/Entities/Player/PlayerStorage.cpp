@@ -508,8 +508,8 @@ Item* Player::GetWeaponForAttack(WeaponAttackType attackType, bool useable /*= f
         item = GetUseableItemByPos(INVENTORY_SLOT_BAG_0, slot);
     else
         item = GetItemByPos(INVENTORY_SLOT_BAG_0, slot);
-    if (!item || item->GetTemplate()->Class != ITEM_CLASS_WEAPON)
-        return nullptr;
+    // if (!item || item->GetTemplate()->Class != ITEM_CLASS_WEAPON)
+    //     return nullptr;
 
     if (!useable)
         return item;
@@ -527,8 +527,8 @@ Item* Player::GetShield(bool useable) const
         item = GetUseableItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_OFFHAND);
     else
         item = GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_OFFHAND);
-    if (!item || item->GetTemplate()->Class != ITEM_CLASS_ARMOR)
-        return nullptr;
+    // if (!item || item->GetTemplate()->Class != ITEM_CLASS_ARMOR)
+    //     return nullptr;
 
     if (!useable)
         return item;
@@ -1805,180 +1805,34 @@ InventoryResult Player::CanEquipNewItem(uint8 slot, uint16& dest, uint32 item, b
 InventoryResult Player::CanEquipItem(uint8 slot, uint16& dest, Item* pItem, bool swap, bool not_loading) const
 {
     dest = 0;
-    if (pItem)
-    {
-        LOG_DEBUG("entities.player.items", "STORAGE: CanEquipItem slot = {}, item = {}, count = {}", slot, pItem->GetEntry(), pItem->GetCount());
-        ItemTemplate const* pProto = pItem->GetTemplate();
-        if (pProto)
-        {
-            if (!sScriptMgr->OnPlayerCanEquipItem(const_cast<Player*>(this), slot, dest, pItem, swap, not_loading))
-                return EQUIP_ERR_CANT_DO_RIGHT_NOW;
+    if (!pItem)
+        return !swap ? EQUIP_ERR_ITEM_NOT_FOUND : EQUIP_ERR_ITEMS_CANT_BE_SWAPPED;
 
-            // item used
-            if (pItem->m_lootGenerated)
-                return EQUIP_ERR_ALREADY_LOOTED;
+    ItemTemplate const* pProto = pItem->GetTemplate();
+    if (!pProto)
+        return EQUIP_ERR_ITEM_NOT_FOUND;
 
-            if (pItem->IsBindedNotWith(this))
-                return EQUIP_ERR_DONT_OWN_THAT_ITEM;
+    // --- Core Sanity Checks (Kept) ---
+    // Check if the item has already been looted from a container.
+    if (pItem->m_lootGenerated)
+        return EQUIP_ERR_ALREADY_LOOTED;
 
-            // check count of items (skip for auto move for same player from bank)
-            InventoryResult res = CanTakeMoreSimilarItems(pItem);
-            if (res != EQUIP_ERR_OK)
-                return res;
+    // Check if the item is soulbound to another player.
+    if (pItem->IsBindedNotWith(this))
+        return EQUIP_ERR_DONT_OWN_THAT_ITEM;
 
-            // check this only in game
-            if (not_loading)
-            {
-                // May be here should be more stronger checks; STUNNED checked
-                // ROOT, CONFUSED, DISTRACTED, FLEEING this needs to be checked.
-                if (HasUnitState(UNIT_STATE_STUNNED))
-                    return EQUIP_ERR_YOU_ARE_STUNNED;
+    // Find a valid equipment slot for this item type.
+    uint8 eslot = FindEquipSlot(pProto, slot, swap);
+    if (eslot == NULL_SLOT)
+        return EQUIP_ERR_ITEM_CANT_BE_EQUIPPED;
 
-                // do not allow equipping gear except weapons, offhands, projectiles, relics in
-                // - combat
-                // - in-progress arenas
-                if (!pProto->CanChangeEquipStateInCombat())
-                {
-                    if (IsInCombat())
-                        return EQUIP_ERR_NOT_IN_COMBAT;
+    // Check if an item is already in the target slot if not swapping.
+    if (!swap && GetItemByPos(INVENTORY_SLOT_BAG_0, eslot))
+        return EQUIP_ERR_NO_EQUIPMENT_SLOT_AVAILABLE;
 
-                    if (Battleground* bg = GetBattleground())
-                        if (bg->isArena() && bg->GetStatus() == STATUS_IN_PROGRESS)
-                            return EQUIP_ERR_NOT_DURING_ARENA_MATCH;
-                }
-
-                if (IsInCombat() && (pProto->Class == ITEM_CLASS_WEAPON || pProto->InventoryType == INVTYPE_RELIC) && m_weaponChangeTimer != 0)
-                    return EQUIP_ERR_CANT_DO_RIGHT_NOW;         // maybe exist better err
-
-                if (IsNonMeleeSpellCast(false))
-                    return EQUIP_ERR_CANT_DO_RIGHT_NOW;
-            }
-
-            ScalingStatDistributionEntry const* ssd = pProto->ScalingStatDistribution ? sScalingStatDistributionStore.LookupEntry(pProto->ScalingStatDistribution) : 0;
-            // check allowed level (extend range to upper values if MaxLevel more or equal max player level, this let GM set high level with 1...max range items)
-            if (ssd && ssd->MaxLevel < DEFAULT_MAX_LEVEL && ssd->MaxLevel < GetLevel())
-                return EQUIP_ERR_ITEM_CANT_BE_EQUIPPED;
-
-            uint8 eslot = FindEquipSlot(pProto, slot, swap);
-            if (eslot == NULL_SLOT)
-                return EQUIP_ERR_ITEM_CANT_BE_EQUIPPED;
-
-            // Xinef: dont allow to equip items on disarmed slot
-            if (!CanUseAttackType(GetAttackBySlot(eslot)))
-                return EQUIP_ERR_NOT_WHILE_DISARMED;
-
-            res = CanUseItem(pItem, not_loading);
-            if (res != EQUIP_ERR_OK)
-                return res;
-
-            if (!swap && GetItemByPos(INVENTORY_SLOT_BAG_0, eslot))
-                return EQUIP_ERR_NO_EQUIPMENT_SLOT_AVAILABLE;
-
-            // if we are swapping 2 equipped items, CanEquipUniqueItem check
-            // should ignore the item we are trying to swap, and not the
-            // destination item. CanEquipUniqueItem should ignore destination
-            // item only when we are swapping weapon from bag
-            uint8 ignore = uint8(NULL_SLOT);
-            switch (eslot)
-            {
-                case EQUIPMENT_SLOT_MAINHAND:
-                    ignore = EQUIPMENT_SLOT_OFFHAND;
-                    break;
-                case EQUIPMENT_SLOT_OFFHAND:
-                    ignore = EQUIPMENT_SLOT_MAINHAND;
-                    break;
-                case EQUIPMENT_SLOT_FINGER1:
-                    ignore = EQUIPMENT_SLOT_FINGER2;
-                    break;
-                case EQUIPMENT_SLOT_FINGER2:
-                    ignore = EQUIPMENT_SLOT_FINGER1;
-                    break;
-                case EQUIPMENT_SLOT_TRINKET1:
-                    ignore = EQUIPMENT_SLOT_TRINKET2;
-                    break;
-                case EQUIPMENT_SLOT_TRINKET2:
-                    ignore = EQUIPMENT_SLOT_TRINKET1;
-                    break;
-            }
-
-            if (ignore == uint8(NULL_SLOT) || pItem != GetItemByPos(INVENTORY_SLOT_BAG_0, ignore))
-                ignore = eslot;
-
-            InventoryResult res2 = CanEquipUniqueItem(pItem, swap ? ignore : uint8(NULL_SLOT));
-            if (res2 != EQUIP_ERR_OK)
-                return res2;
-
-            // check unique-equipped special item classes
-            if (pProto->Class == ITEM_CLASS_QUIVER)
-                for (uint8 i = INVENTORY_SLOT_BAG_START; i < INVENTORY_SLOT_BAG_END; ++i)
-                    if (Item* pBag = GetItemByPos(INVENTORY_SLOT_BAG_0, i))
-                        if (pBag != pItem)
-                            if (ItemTemplate const* pBagProto = pBag->GetTemplate())
-                                if (pBagProto->Class == pProto->Class && (!swap || pBag->GetSlot() != eslot))
-                                    return (pBagProto->SubClass == ITEM_SUBCLASS_AMMO_POUCH)
-                                           ? EQUIP_ERR_CAN_EQUIP_ONLY1_AMMOPOUCH
-                                           : EQUIP_ERR_CAN_EQUIP_ONLY1_QUIVER;
-
-            uint32 type = pProto->InventoryType;
-
-            if (eslot == EQUIPMENT_SLOT_OFFHAND)
-            {
-                // Do not allow polearm to be equipped in the offhand (rare case for the only 1h polearm 41750)
-                // xinef: same for fishing poles
-                if (type == INVTYPE_WEAPON && (pProto->SubClass == ITEM_SUBCLASS_WEAPON_POLEARM || pProto->SubClass == ITEM_SUBCLASS_WEAPON_FISHING_POLE))
-                    return EQUIP_ERR_ITEM_DOESNT_GO_TO_SLOT;
-
-                else if (type == INVTYPE_WEAPON || type == INVTYPE_WEAPONOFFHAND)
-                {
-                    if (!CanDualWield())
-                        return EQUIP_ERR_CANT_DUAL_WIELD;
-                }
-                else if (type == INVTYPE_2HWEAPON)
-                {
-                    if (!CanDualWield() || !CanTitanGrip())
-                        return EQUIP_ERR_CANT_DUAL_WIELD;
-                }
-
-                // Do not allow offhand with main hand polearm, staff or fishing pole
-                if (Item* mhWeapon = GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_MAINHAND))
-                    if (ItemTemplate const* mhWeaponProto = mhWeapon->GetTemplate())
-                        if (mhWeaponProto->SubClass == ITEM_SUBCLASS_WEAPON_POLEARM ||
-                            mhWeaponProto->SubClass == ITEM_SUBCLASS_WEAPON_STAFF ||
-                            mhWeaponProto->SubClass == ITEM_SUBCLASS_WEAPON_FISHING_POLE)
-                            return EQUIP_ERR_CANT_EQUIP_WITH_TWOHANDED;
-
-                if (IsTwoHandUsed())
-                    return EQUIP_ERR_CANT_EQUIP_WITH_TWOHANDED;
-            }
-
-            // equip two-hand weapon case (with possible unequip 2 items)
-            if (type == INVTYPE_2HWEAPON)
-            {
-                if (eslot == EQUIPMENT_SLOT_OFFHAND)
-                {
-                    if (!CanTitanGrip())
-                        return EQUIP_ERR_ITEM_CANT_BE_EQUIPPED;
-                }
-                else if (eslot != EQUIPMENT_SLOT_MAINHAND)
-                    return EQUIP_ERR_ITEM_CANT_BE_EQUIPPED;
-
-                if (!CanTitanGrip() || (pProto->SubClass == ITEM_SUBCLASS_WEAPON_POLEARM || pProto->SubClass == ITEM_SUBCLASS_WEAPON_STAFF || pProto->SubClass == ITEM_SUBCLASS_WEAPON_FISHING_POLE))
-                {
-                    // offhand item must can be stored in inventory for offhand item and it also must be unequipped
-                    Item* offItem = GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_OFFHAND);
-                    ItemPosCountVec off_dest;
-                    if (offItem && (!not_loading ||
-                                    CanUnequipItem(uint16(INVENTORY_SLOT_BAG_0) << 8 | EQUIPMENT_SLOT_OFFHAND, false) != EQUIP_ERR_OK ||
-                                    CanStoreItem(NULL_BAG, NULL_SLOT, off_dest, offItem, false) != EQUIP_ERR_OK))
-                        return swap ? EQUIP_ERR_ITEMS_CANT_BE_SWAPPED : EQUIP_ERR_INVENTORY_FULL;
-                }
-            }
-            dest = ((INVENTORY_SLOT_BAG_0 << 8) | eslot);
-            return EQUIP_ERR_OK;
-        }
-    }
-
-    return !swap ? EQUIP_ERR_ITEM_NOT_FOUND : EQUIP_ERR_ITEMS_CANT_BE_SWAPPED;
+    // Set the destination and approve the equip.
+    dest = ((INVENTORY_SLOT_BAG_0 << 8) | eslot);
+    return EQUIP_ERR_OK;
 }
 
 InventoryResult Player::CanUnequipItem(uint16 pos, bool swap) const
@@ -2238,27 +2092,20 @@ InventoryResult Player::CanUseItem(Item* pItem, bool not_loading) const
             if (res != EQUIP_ERR_OK)
                 return res;
 
+
+
             if (pItem->GetSkill() != 0)
             {
-                bool allowEquip = false;
+                bool allowEquip = true;
                 uint32 itemSkill = pItem->GetSkill();
-                // Armor that is binded to account can "morph" from plate to mail, etc. if skill is not learned yet.
-                if (pProto->Quality == ITEM_QUALITY_HEIRLOOM && pProto->Class == ITEM_CLASS_ARMOR && !HasSkill(itemSkill))
-                {
-                    /// @todo: when you right-click already equipped item it throws EQUIP_ERR_NO_REQUIRED_PROFICIENCY.
 
-                    // In fact it's a visual bug, everything works properly... I need sniffs of operations with
-                    // binded to account items from off server.
 
-                    if (IsClass(CLASS_PALADIN, CLASS_CONTEXT_EQUIP_ARMOR_CLASS) || IsClass(CLASS_WARRIOR, CLASS_CONTEXT_EQUIP_ARMOR_CLASS))
-                    {
-                        allowEquip = (itemSkill == SKILL_PLATE_MAIL);
-                    }
-                    else if (IsClass(CLASS_HUNTER, CLASS_CONTEXT_EQUIP_ARMOR_CLASS) || IsClass(CLASS_SHAMAN, CLASS_CONTEXT_EQUIP_ARMOR_CLASS))
-                    {
-                        allowEquip = (itemSkill == SKILL_MAIL);
-                    }
-                }
+
+                if (!allowEquip && GetSkillValue(itemSkill) == 0)
+                    return EQUIP_ERR_OK;
+            }
+
+        }
     }
     return EQUIP_ERR_ITEM_NOT_FOUND;
 }
@@ -2272,37 +2119,6 @@ InventoryResult Player::CanUseItem(ItemTemplate const* proto) const
         return EQUIP_ERR_ITEM_NOT_FOUND;
     }
 
-    if (proto->HasFlag2(ITEM_FLAG2_FACTION_HORDE) && GetTeamId(true) != TEAM_HORDE)
-    {
-        return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
-    }
-
-    if (proto->HasFlag2(ITEM_FLAG2_FACTION_ALLIANCE) && GetTeamId(true) != TEAM_ALLIANCE)
-    {
-        return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
-    }
-
-    if ((proto->AllowableClass & getClassMask()) == 0 || (proto->AllowableRace & getRaceMask()) == 0)
-    {
-        return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
-    }
-
-    if (proto->RequiredSkill != 0)
-    {
-        if (GetSkillValue(proto->RequiredSkill) == 0)
-        {
-            return EQUIP_ERR_NO_REQUIRED_PROFICIENCY;
-        }
-        else if (GetSkillValue(proto->RequiredSkill) < proto->RequiredSkillRank)
-        {
-            return EQUIP_ERR_CANT_EQUIP_SKILL;
-        }
-    }
-
-    if (proto->RequiredSpell != 0 && !HasSpell(proto->RequiredSpell))
-    {
-        return EQUIP_ERR_NO_REQUIRED_PROFICIENCY;
-    }
 
     if (GetLevel() < proto->RequiredLevel)
     {
@@ -2347,106 +2163,6 @@ InventoryResult Player::CanRollForItemInLFG(ItemTemplate const* proto, WorldObje
         SKILL_DAGGERS,  SKILL_THROWN,   SKILL_ASSASSINATION, SKILL_CROSSBOWS,   SKILL_WANDS,
         SKILL_FISHING
     }; //Copy from function Item::GetSkill()
-
-    if ((proto->AllowableClass & getClassMask()) == 0 || (proto->AllowableRace & getRaceMask()) == 0)
-        return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
-
-    if (proto->RequiredSpell != 0 && !HasSpell(proto->RequiredSpell))
-        return EQUIP_ERR_NO_REQUIRED_PROFICIENCY;
-
-    if (proto->RequiredSkill != 0)
-    {
-        if (!GetSkillValue(proto->RequiredSkill))
-            return EQUIP_ERR_NO_REQUIRED_PROFICIENCY;
-        else if (GetSkillValue(proto->RequiredSkill) < proto->RequiredSkillRank)
-            return EQUIP_ERR_CANT_EQUIP_SKILL;
-    }
-
-    if (proto->Class == ITEM_CLASS_WEAPON && GetSkillValue(item_weapon_skills[proto->SubClass]) == 0)
-        return EQUIP_ERR_NO_REQUIRED_PROFICIENCY;
-
-    if (proto->Class == ITEM_CLASS_ARMOR)
-    {
-        // Check for shields
-        if (proto->SubClass == ITEM_SUBCLASS_ARMOR_SHIELD && !(
-            IsClass(CLASS_PALADIN, CLASS_CONTEXT_EQUIP_SHIELDS)
-            || IsClass(CLASS_WARRIOR, CLASS_CONTEXT_EQUIP_SHIELDS)
-            || IsClass(CLASS_SHAMAN, CLASS_CONTEXT_EQUIP_SHIELDS)))
-        {
-            return EQUIP_ERR_NO_REQUIRED_PROFICIENCY;
-        }
-
-        // Check for librams.
-        if (proto->SubClass == ITEM_SUBCLASS_ARMOR_LIBRAM && !IsClass(CLASS_PALADIN, CLASS_CONTEXT_EQUIP_RELIC))
-        {
-            return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
-        }
-
-        // CHeck for idols.
-        if (proto->SubClass == ITEM_SUBCLASS_ARMOR_IDOL && !IsClass(CLASS_DRUID, CLASS_CONTEXT_EQUIP_RELIC))
-        {
-            return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
-        }
-
-        // Check for totems.
-        if (proto->SubClass == ITEM_SUBCLASS_ARMOR_TOTEM && !IsClass(CLASS_SHAMAN, CLASS_CONTEXT_EQUIP_RELIC))
-        {
-            return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
-        }
-
-        // Check for sigils.
-        if (proto->SubClass == ITEM_SUBCLASS_ARMOR_SIGIL && !IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_EQUIP_RELIC))
-        {
-            return EQUIP_ERR_YOU_CAN_NEVER_USE_THAT_ITEM;
-        }
-    }
-
-    if (proto->Class == ITEM_CLASS_ARMOR && proto->SubClass > ITEM_SUBCLASS_ARMOR_MISC && proto->SubClass < ITEM_SUBCLASS_ARMOR_BUCKLER &&
-        proto->InventoryType != INVTYPE_CLOAK)
-    {
-        uint32 subclassToCompare = ITEM_SUBCLASS_ARMOR_CLOTH;
-        if (IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_EQUIP_ARMOR_CLASS) || IsClass(CLASS_PALADIN, CLASS_CONTEXT_EQUIP_ARMOR_CLASS))
-        {
-            subclassToCompare = ITEM_SUBCLASS_ARMOR_PLATE;
-        }
-        else if (IsClass(CLASS_WARRIOR, CLASS_CONTEXT_EQUIP_ARMOR_CLASS))
-        {
-            if ((proto->HasStat(ITEM_MOD_SPELL_POWER) || proto->HasSpellPowerStat()))
-            {
-                return EQUIP_ERR_CANT_DO_RIGHT_NOW;
-            }
-            subclassToCompare = ITEM_SUBCLASS_ARMOR_PLATE;
-        }
-        else if (IsClass(CLASS_HUNTER, CLASS_CONTEXT_EQUIP_ARMOR_CLASS) || IsClass(CLASS_SHAMAN, CLASS_CONTEXT_EQUIP_ARMOR_CLASS))
-        {
-            subclassToCompare = ITEM_SUBCLASS_ARMOR_MAIL;
-        }
-        else if (IsClass(CLASS_DRUID, CLASS_CONTEXT_EQUIP_ARMOR_CLASS))
-        {
-            subclassToCompare = ITEM_SUBCLASS_ARMOR_LEATHER;
-        }
-        else if (IsClass(CLASS_ROGUE, CLASS_CONTEXT_EQUIP_ARMOR_CLASS))
-        {
-            if (proto->HasStat(ITEM_MOD_SPELL_POWER) || proto->HasSpellPowerStat())
-            {
-                return EQUIP_ERR_CANT_DO_RIGHT_NOW;
-            }
-            subclassToCompare = ITEM_SUBCLASS_ARMOR_LEATHER;
-        }
-
-        if (proto->SubClass > subclassToCompare)
-        {
-            return EQUIP_ERR_CANT_DO_RIGHT_NOW;
-        }
-        else if (sWorld->getIntConfig(CONFIG_LOOT_NEED_BEFORE_GREED_ILVL_RESTRICTION) && proto->ItemLevel > sWorld->getIntConfig(CONFIG_LOOT_NEED_BEFORE_GREED_ILVL_RESTRICTION))
-        {
-            if (proto->SubClass < subclassToCompare)
-            {
-                return EQUIP_ERR_CANT_DO_RIGHT_NOW;
-            }
-        }
-    }
-
     return EQUIP_ERR_OK;
 }
 
@@ -2464,8 +2180,8 @@ InventoryResult Player::CanUseAmmo(uint32 item) const
             return EQUIP_ERR_ONLY_AMMO_CAN_GO_HERE;
 
         InventoryResult res = CanUseItem(pProto);
-        if (res != EQUIP_ERR_OK)
-            return res;
+        // if (res != EQUIP_ERR_OK)
+        //     return res;
 
         /*if (GetReputationMgr().GetReputation() < pProto->RequiredReputation)
         return EQUIP_ERR_CANT_EQUIP_REPUTATION;
@@ -2491,11 +2207,11 @@ void Player::SetAmmo(uint32 item)
 
     // check ammo
     InventoryResult msg = CanUseAmmo(item);
-    if (msg != EQUIP_ERR_OK)
-    {
-        SendEquipError(msg, nullptr, nullptr, item);
-        return;
-    }
+    // if (msg != EQUIP_ERR_OK)
+    // {
+    //     SendEquipError(msg, nullptr, nullptr, item);
+    //     return;
+    // }
 
     SetUInt32Value(PLAYER_AMMO_ID, item);
 
@@ -2739,7 +2455,7 @@ Item* Player::EquipItem(uint16 pos, Item* pItem, bool update)
 
             _ApplyItemMods(pItem, slot, true);
 
-            if (pProto && IsInCombat() && (pProto->Class == ITEM_CLASS_WEAPON || pProto->InventoryType == INVTYPE_RELIC) && m_weaponChangeTimer == 0)
+            if (pProto && IsInCombat() && (pProto->InventoryType == INVTYPE_RELIC) && m_weaponChangeTimer == 0)
             {
                 uint32 cooldownSpell = IsClass(CLASS_ROGUE, CLASS_CONTEXT_WEAPON_SWAP) ? 6123 : 6119;
                 SpellInfo const* spellProto = sSpellMgr->GetSpellInfo(cooldownSpell);

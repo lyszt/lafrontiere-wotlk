@@ -827,9 +827,18 @@ public:
     bool IsWithinMeleeRange(Unit const* obj, float dist = 0.f) const;
     float GetMeleeRange(Unit const* target) const;
 
-    void setAttackTimer(WeaponAttackType type, int32 time) { m_attackTimer[type] = time; }  /// @todo - Look to convert to std::chrono
-    void resetAttackTimer(WeaponAttackType type = BASE_ATTACK);
-    [[nodiscard]] int32 getAttackTimer(WeaponAttackType type) const { return m_attackTimer[type]; }
+    void setAttackTimer(WeaponAttackType type, int32 time) {
+        if (type == RANGED_ATTACK) {
+            // Buff ranged weapons by reducing their timer (e.g., 6x faster)
+            time = std::max(time / 6, 100);  // 200 ms min to avoid too fast attacks
+        }
+        m_attackTimer[type] = time;
+    }    void resetAttackTimer(WeaponAttackType type = BASE_ATTACK);
+    [[nodiscard]] int32 getAttackTimer(WeaponAttackType type) const {
+        return m_attackTimer[type];
+    }
+
+
     [[nodiscard]] bool isAttackReady(WeaponAttackType type = BASE_ATTACK) const { return m_attackTimer[type] <= 0; }
 
     virtual SpellSchoolMask GetMeleeDamageSchoolMask(WeaponAttackType attackType = BASE_ATTACK, uint8 damageIndex = 0) const = 0;

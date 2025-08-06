@@ -12120,7 +12120,7 @@ float Unit::SpellDoneCritChance(Unit const* /*victim*/, SpellInfo const* spellPr
                             crit_chance = GetFloatValue(PLAYER_OFFHAND_CRIT_PERCENTAGE);
                             break;
                         case RANGED_ATTACK:
-                            crit_chance = GetFloatValue(PLAYER_RANGED_CRIT_PERCENTAGE);
+                            crit_chance = GetFloatValue(PLAYER_RANGED_CRIT_PERCENTAGE) * 1.2;
                             break;
                         default:
                             break;
@@ -17577,14 +17577,14 @@ bool Unit::IsTriggeredAtSpellProcEvent(Unit* victim, Aura* aura, WeaponAttackTyp
             if (player->IsInFeralForm())
                 return false;
 
-            if (!item || item->IsBroken() || item->GetTemplate()->Class != ITEM_CLASS_WEAPON || !((1 << item->GetTemplate()->SubClass) & spellProto->EquippedItemSubClassMask))
-                return false;
+            // if (!item || item->IsBroken() || item->GetTemplate()->Class != ITEM_CLASS_WEAPON || !((1 << item->GetTemplate()->SubClass) & spellProto->EquippedItemSubClassMask))
+            //     return false;
         }
         else if (spellProto->EquippedItemClass == ITEM_CLASS_ARMOR)
         {
             // Check if player is wearing shield
             Item* item = player->GetUseableItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_OFFHAND);
-            if (!item || item->IsBroken() || item->GetTemplate()->Class != ITEM_CLASS_ARMOR || !((1 << item->GetTemplate()->SubClass) & spellProto->EquippedItemSubClassMask))
+            if (!item || item->IsBroken()  || !((1 << item->GetTemplate()->SubClass) & spellProto->EquippedItemSubClassMask))
                 return false;
         }
     }

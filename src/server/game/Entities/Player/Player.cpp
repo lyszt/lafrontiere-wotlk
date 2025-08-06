@@ -3108,30 +3108,6 @@ bool Player::addSpell(uint32 spellId, uint8 addSpecMask, bool updateActive, bool
 
 bool Player::CheckSkillLearnedBySpell(uint32 spellId)
 {
-    if (!sWorld->getBoolConfig(CONFIG_VALIDATE_SKILL_LEARNED_BY_SPELLS))
-        return true;
-
-    SkillLineAbilityMapBounds skill_bounds = sSpellMgr->GetSkillLineAbilityMapBounds(spellId);
-    uint32 errorSkill = 0;
-    for (SkillLineAbilityMap::const_iterator sla = skill_bounds.first; sla != skill_bounds.second; ++sla)
-    {
-        SkillLineEntry const* pSkill = sSkillLineStore.LookupEntry(sla->second->SkillLine);
-        if (!pSkill)
-            continue;
-
-        if (GetSkillRaceClassInfo(pSkill->id, getRace(), getClass()))
-            return true;
-        else
-            errorSkill = pSkill->id;
-    }
-
-    if (errorSkill)
-    {
-        LOG_ERROR("entities.player", "Player {} (GUID: {}), has spell ({}) that teach skill ({}) which is invalid for the race/class combination (Race: {}, Class: {}). Will be deleted.",
-            GetName(), GetGUID().GetCounter(), spellId, errorSkill, getRace(), getClass());
-
-        return false;
-    }
     return true;
 }
 
@@ -6855,19 +6831,7 @@ void Player::_ApplyItemBonuses(ItemTemplate const* proto, uint8 slot, bool apply
     if (armor)
     {
         UnitModifierType modType = TOTAL_VALUE;
-        if (proto->Class == ITEM_CLASS_ARMOR)
-        {
-            switch (proto->SubClass)
-            {
-                case ITEM_SUBCLASS_ARMOR_CLOTH:
-                case ITEM_SUBCLASS_ARMOR_LEATHER:
-                case ITEM_SUBCLASS_ARMOR_MAIL:
-                case ITEM_SUBCLASS_ARMOR_PLATE:
-                case ITEM_SUBCLASS_ARMOR_SHIELD:
-                    modType = BASE_VALUE;
-                    break;
-            }
-        }
+        modType = BASE_VALUE;
         HandleStatModifier(UNIT_MOD_ARMOR, modType, float(armor), apply);
     }
 
@@ -7676,25 +7640,25 @@ bool Player::CheckAmmoCompatibility(ItemTemplate const* ammo_proto) const
     if (!weapon  || weapon->IsBroken())
         return false;
 
-    ItemTemplate const* weapon_proto = weapon->GetTemplate();
-    if (!weapon_proto || weapon_proto->Class != ITEM_CLASS_WEAPON)
-        return false;
+    // ItemTemplate const* weapon_proto = weapon->GetTemplate();
+    // if (!weapon_proto || weapon_proto->Class != ITEM_CLASS_WEAPON)
+    //     return false;
 
-    // check ammo ws. weapon compatibility
-    switch (weapon_proto->SubClass)
-    {
-        case ITEM_SUBCLASS_WEAPON_BOW:
-        case ITEM_SUBCLASS_WEAPON_CROSSBOW:
-            if (ammo_proto->SubClass != ITEM_SUBCLASS_ARROW)
-                return false;
-            break;
-        case ITEM_SUBCLASS_WEAPON_GUN:
-            if (ammo_proto->SubClass != ITEM_SUBCLASS_BULLET)
-                return false;
-            break;
-        default:
-            return false;
-    }
+    // // check ammo ws. weapon compatibility
+    // switch (weapon_proto->SubClass)
+    // {
+    //     case ITEM_SUBCLASS_WEAPON_BOW:
+    //     case ITEM_SUBCLASS_WEAPON_CROSSBOW:
+    //         if (ammo_proto->SubClass != ITEM_SUBCLASS_ARROW)
+    //             return false;
+    //         break;
+    //     case ITEM_SUBCLASS_WEAPON_GUN:
+    //         if (ammo_proto->SubClass != ITEM_SUBCLASS_BULLET)
+    //             return false;
+    //         break;
+    //     default:
+    //         return false;
+    // }
 
     return true;
 }
@@ -10090,7 +10054,9 @@ void Player::SetSpellModTakingSpell(Spell* spell, bool apply)
 void Player::SendProficiency(ItemClass itemClass, uint32 itemSubclassMask)
 {
     WorldPacket data(SMSG_SET_PROFICIENCY, 1 + 4);
-    data << uint8(itemClass) << uint32(itemSubclassMask);
+    // Send the item class, but replace the specific mask with 0xFFFFFFFF.
+    // This tells the client the player has every proficiency for this item class.
+    data << uint8(itemClass) << uint32(0xFFFFFFFF);
     GetSession()->SendPacket(&data);
 }
 
@@ -13652,15 +13618,7 @@ void Player::_LoadSkills(PreparedQueryResult result)
             uint16 max      = fields[2].Get<uint16>();
 
             SkillRaceClassInfoEntry const* rcEntry = GetSkillRaceClassInfo(skill, getRace(), getClass());
-            if (!rcEntry)
-            {
-                LOG_ERROR("entities.player", "Player {} (GUID: {}), has skill ({}) that is invalid for the race/class combination (Race: {}, Class: {}). Will be deleted.",
-                    GetName(), GetGUID().GetCounter(), skill, getRace(), getClass());
 
-                // Mark skill for deletion in the database
-                mSkillStatus.insert(SkillStatusMap::value_type(skill, SkillStatusData(0, SKILL_DELETED)));
-                continue;
-            }
 
             // set fixed skill ranges
             switch (GetSkillRangeType(rcEntry))

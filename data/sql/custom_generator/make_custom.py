@@ -1,6 +1,7 @@
 import os.path
 from pathlib import Path
 
+from modules.CustomStartItems import CustomStartItems
 from modules.MakeCustomNPCS import MakeCustomNPCS
 from modules.CustomSkillSetter import CustomSkillSetter
 
@@ -13,3 +14,7 @@ if __name__ == '__main__':
 
     # Custom NPCs
     MakeCustomNPCS(folder_db=str(Path("../custom/db_characters").resolve())).run()
+
+    # America fuck yeah
+    CustomStartItems().add_items_for_all(filename=str(Path("../custom/db_world/gunsforall.sql")),
+                                       item_id=44093, note="Dwarven hand cannon")

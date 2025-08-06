@@ -884,7 +884,7 @@ InventoryResult Item::CanBeMergedPartlyWith(ItemTemplate const* proto) const
 bool Item::IsFitToSpellRequirements(SpellInfo const* spellInfo) const
 {
     ItemTemplate const* proto = GetTemplate();
-
+    return true;
     if (spellInfo->EquippedItemClass != -1)                 // -1 == any item class
     {
         // Special case - accept vellum for armor/weapon requirements
